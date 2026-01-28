@@ -1,0 +1,64 @@
+name: CTF Reminder Bot
+
+on:
+  schedule:
+    # Fetch events every day at 00:00 UTC
+    - cron: "0 0 * * *"
+  workflow_dispatch:  # manual trigger
+
+jobs:
+  fetch_events:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+      - name: Fetch week CTF events
+        run: python fetch_ctfs.py
+      - name: Commit ctf_events.json
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add ctf_events.json
+          git commit -m "Update weekly CTF events"
+          git push
+
+  send_reminders:
+    runs-on: ubuntu-latest
+    needs: fetch_events
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Send reminders for next 24h
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
+        run: python bot.py
+
+  send_week_list:
+    runs-on: ubuntu-latest
+    needs: fetch_events
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Send week list
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
+        run: python bot.py week
